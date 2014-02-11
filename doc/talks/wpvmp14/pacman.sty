@@ -1,0 +1,64 @@
+%
+% This package provides a fancy pacman slide counter for beamer
+%
+% author: Serge « sans paille » Guelton <serge.guelton@telecom-bretagne.eu>
+%
+% usage: \usepackage{pacman} redefines the navigation symbols
+%
+% note: the pacman color is the same as the one used by the \struct{} command
+%
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{pacman}
+
+\RequirePackage{pgf}
+\RequirePackage{tikz}
+
+%
+%% body
+
+\makeatletter
+\usenavigationsymbolstemplate{%
+	\ifbeamer@draftmode % donothing under draft mode to save precious time
+	\else % and nothing at the front page
+		\ifnum\insertframestartpage=\insertpagenumber
+			\hypertarget{Frame\insertframenumber}{}
+		\fi
+
+		\ifnum\c@framenumber>1
+		\color{beamerstructure}
+			\begin{tikzpicture}
+	  			\pgfmathsetmacro{\mynumber}{\inserttotalframenumber}
+	  			\pgfmathsetmacro{\mylistnumber}{\mynumber-1}
+	  			\pgfmathsetmacro{\mywidth}{128/\mynumber}
+	  			\pgfmathsetmacro{\mycurr}{\insertframenumber-1}
+	  			\pgfmathsetmacro{\mynextcurr}{\mycurr+1}
+	  			\pgfmathsetmacro{\intcurr}{floor(\mycurr)}
+
+  				\ifnum\c@framenumber<\mynumber
+  					\node[text=structure] at (\mycurr*\mywidth*1mm,1.4mm) {  \intcurr  } ;
+  					\draw[draw=structure] (\mycurr*\mywidth*1mm,.4mm) arc [start angle=90, delta angle=180, x radius=.4mm, y radius=.4mm] -- (\mycurr*\mywidth*1mm,-.4mm);
+  					\draw[draw=structure] (\mycurr*\mywidth*1mm,.4mm) arc [start angle=90, delta angle=-60, x radius=.4mm, y radius=.4mm] -- (\mycurr*\mywidth*1mm,0);
+  					\draw[draw=structure] (\mycurr*\mywidth*1mm,-.4mm) arc [start angle=-90, delta angle=60, x radius=.4mm, y radius=.4mm] -- (\mycurr*\mywidth*1mm,0);
+  					\foreach \x in {\mynextcurr,..., \mylistnumber}
+  					{
+  						\pgfmathparse{mod(\x,10) ? ".2mm" : ".4mm"}
+  						\edef\r{\pgfmathresult}
+  						\pgfmathparse{int(\x+1)}
+  						\edef\f{\pgfmathresult}
+  						\node at (\x*\mywidth*1mm, 0)
+						{\hyperlink{Frame\f}{\tikz{\draw[draw=structure] (\x*\mywidth*1mm, 0) circle (\r);}}};
+  					}
+  				\else
+  					\draw[draw=structure,fill=structure] (0, .4mm) arc [start angle=90, delta angle=180, x radius=.4mm, y radius=.4mm] -- (0,-.4mm);
+  					\draw[draw=structure,fill=structure] (0, .4mm) arc [start angle=90, delta angle=-60, x radius=.4mm, y radius=.4mm] -- (0,0);
+  					\draw[draw=structure,fill=structure] (0,-.4mm) arc [start  angle=-90,delta angle= 60, x radius=.4mm, y radius=.4mm] -- (0,0);
+  				\fi
+			\end{tikzpicture}
+		\fi
+	\fi
+}
+\makeatother
+
+\ProcessOptions% evenf if none :-)
+\endinput

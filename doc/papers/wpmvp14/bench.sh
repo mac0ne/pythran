@@ -24,9 +24,10 @@ Pythran+AVX 0.452
 EOF
 
 cat > numexpr.dat << EOF
-CPython 7.48
-Pythran 6.19
-Pythran+AVX 4.05
+CPython 8.77
+Pythran 5.39
+Pythran+AVX (auto) 4.4
+Pythran+AVX (boost) 3.75
 EOF
 
 cat > rosen.dat << EOF
