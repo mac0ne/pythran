@@ -457,7 +457,7 @@ class ExpressionType(Type):
 
     >>> op = lambda x,y: x + '+' + y
     >>> ExpressionType(op, [NamedType('long'), NamedType('int')])
-    decltype(std::declval<long>()+std::declval<int>())
+    decltype(std::declval<long&>()+std::declval<int&>())
     '''
     def __init__(self, op, exprs):
         super(ExpressionType, self).__init__(
@@ -468,4 +468,4 @@ class ExpressionType(Type):
     def generate(self, ctx):
         texprs = (ctx(expr).generate(ctx) for expr in self.exprs)
         return 'decltype({0})'.format(
-            self.op(*["std::declval<{0}>()".format(t) for t in texprs]))
+            self.op(*["std::declval<{0}&>()".format(t) for t in texprs]))

@@ -86,7 +86,7 @@ namespace pythonic {
 
         template<class T, size_t N>
             struct type_helper<ndarray<T,N>> {
-                typedef numpy_iexpr<ndarray<T,N> const &> type;
+                typedef numpy_iexpr<ndarray<T,N>> type;
 
                 typedef nditerator<ndarray<T,N>> iterator;
                 typedef const_nditerator<ndarray<T,N>> const_iterator;
@@ -105,14 +105,62 @@ namespace pythonic {
                         return from;
                     }
 
-                static numpy_iexpr<ndarray<T,N> const&> get(ndarray<T,N> const& self, long i) {
-                    return numpy_iexpr<ndarray<T,N> const &>(self, i);
+                static numpy_iexpr<ndarray<T,N>> get(ndarray<T,N> const& self, long i) {
+                    return numpy_iexpr<ndarray<T,N>>(self, i);
+                }
+                static long step(ndarray<T,N> const& self) { return std::accumulate(self.shape.begin() + 1, self.shape.end(), 1L, std::multiplies<long>());}
+            };
+        template<class T, size_t N>
+            struct type_helper<ndarray<T,N> const&> {
+                typedef numpy_iexpr<ndarray<T,N> const&> type;
+
+                typedef nditerator<ndarray<T,N>> iterator;
+                typedef const_nditerator<ndarray<T,N>> const_iterator;
+
+                type_helper() = delete; // Not intended to be instantiated
+
+                static iterator make_iterator(ndarray<T,N>& n, long i) { return iterator(n, i); }
+                static const_iterator make_iterator(ndarray<T,N> const & n, long i) { return const_iterator(n, i); }
+
+                template<class S, class Iter>
+                    static T* initialize_from_iterable(S& shape, T* from, Iter&& iter) {
+                        shape[std::tuple_size<S>::value - N] = iter.size();
+                        for(auto content : iter) {
+                            from = type_helper<ndarray<T,N - 1> const &>::initialize_from_iterable(shape, from, content);
+                        }
+                        return from;
+                    }
+
+                static numpy_iexpr<ndarray<T,N>const &> get(ndarray<T,N> const& self, long i) {
+                    return numpy_iexpr<ndarray<T,N> const&>(self, i);
                 }
                 static long step(ndarray<T,N> const& self) { return std::accumulate(self.shape.begin() + 1, self.shape.end(), 1L, std::multiplies<long>());}
             };
 
         template<class T>
             struct type_helper<ndarray<T,1>> {
+                typedef T type;
+
+                typedef T* iterator;
+                typedef T const * const_iterator;
+
+                type_helper() = delete; // Not intended to be instantiated
+
+                static iterator make_iterator(ndarray<T,1>& n, long i) { return n.buffer + i; }
+                static const_iterator make_iterator(ndarray<T,1> const & n, long i) { return n.buffer + i; }
+
+                template<class S, class Iter>
+                    static T* initialize_from_iterable(S& shape, T* from, Iter&& iter) {
+                        shape[std::tuple_size<S>::value - 1] = iter.size();
+                        return std::copy(iter.begin(), iter.end(), from);
+                    }
+                static type& get(ndarray<T,1> const& self, long i) {
+                    return self.buffer[i];
+                }
+                static constexpr long step(ndarray<T,1> const& ) { return 1;}
+            };
+        template<class T>
+            struct type_helper<ndarray<T,1> const &> {
                 typedef T type;
 
                 typedef T* iterator;
@@ -334,25 +382,45 @@ namespace pythonic {
                         return (*this) = (*this) | expr;
                     }
 
-                /* element indexing */
-                auto fast(long i) const -> decltype(type_helper<ndarray<T,N>>::get(*this, i))
+                /* element indexing
+                 * differentiate const from non const, and r-value from l-value
+                 * */
+                auto fast(long i) const & -> decltype(type_helper<ndarray<T,N> const &>::get(*this, i))
+                {
+                    return type_helper<ndarray<T,N> const &>::get(*this, i);
+                }
+                auto fast(long i) const && -> decltype(type_helper<ndarray<T,N>>::get(*this, i))
                 {
                     return type_helper<ndarray<T,N>>::get(*this, i);
                 }
 
-                auto operator[](long i) const -> decltype(this->fast(i))
+                auto operator[](long i) const & -> decltype(this->fast(i))
                 {
                     if(i<0) i += shape[0];
                     return fast(i);
                 }
-                auto operator()(long i) const -> decltype((*this)[i])
+                auto operator()(long i) const & -> decltype((*this)[i])
                 {
                     return (*this)[i];
                 }
-                auto operator()(long i) -> decltype((*this)[i])
+                auto operator()(long i) & -> decltype((*this)[i])
                 {
                     return (*this)[i];
                 }
+                auto operator[](long i) const && -> decltype(this->fast(i))
+                {
+                    if(i<0) i += shape[0];
+                    return fast(i);
+                }
+                auto operator()(long i) const && -> decltype((*this)[i])
+                {
+                    return (*this)[i];
+                }
+                auto operator()(long i) && -> decltype((*this)[i])
+                {
+                    return (*this)[i];
+                }
+
                 T const &operator[](array<long, N> const& indices) const
                 {
                     size_t offset = indices[N-1];
@@ -369,7 +437,13 @@ namespace pythonic {
                 }
 
                 template<size_t M>
-                    auto operator[](array<long, M> const& indices) const
+                    auto operator[](array<long, M> const& indices) const &
+                    -> decltype(nget<M-1>()(*this, indices))
+                    {
+                        return nget<M-1>()(*this, indices);
+                    }
+                template<size_t M>
+                    auto operator[](array<long, M> const& indices) const &&
                     -> decltype(nget<M-1>()(*this, indices))
                     {
                         return nget<M-1>()(*this, indices);
